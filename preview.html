@@ -1374,17 +1374,37 @@
 
         let clientPollerActive = false;
         let clientOffset = parseInt(localStorage.getItem('telegram_client_offset') || "0");
+        const clientTabId = 'tab_' + Math.random().toString(36).substring(2, 9);
+
+        function escapeHtml(str) {
+            return (str || '')
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
 
         async function startBrowserTelegramPoller() {
             if (clientPollerActive) return;
             clientPollerActive = true;
-            console.log("🚀 Browser Telegram Poller Auto-Started...");
+            console.log("🚀 Browser Telegram Poller Auto-Started [Tab ID: " + clientTabId + "]...");
 
             while (clientPollerActive) {
                 try {
+                    const now = Date.now();
+                    const activePoller = localStorage.getItem('active_telegram_poller');
+                    const activeTime = parseInt(localStorage.getItem('active_telegram_poller_time') || '0');
+
+                    if (activePoller && activePoller !== clientTabId && (now - activeTime < 4000)) {
+                        await new Promise(r => setTimeout(r, 2500));
+                        continue;
+                    }
+
+                    localStorage.setItem('active_telegram_poller', clientTabId);
+                    localStorage.setItem('active_telegram_poller_time', now.toString());
+
                     const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${clientOffset}&timeout=3`);
                     if (res.status === 409) {
-                        await new Promise(r => setTimeout(r, 5000));
+                        await new Promise(r => setTimeout(r, 4000));
                         continue;
                     }
                     if (res.ok) {
@@ -1397,11 +1417,12 @@
                             }
                         }
                     }
-                } catch (e) {}
-                await new Promise(r => setTimeout(r, 2000));
+                } catch (e) {
+                    console.error("Poller Loop Error:", e);
+                }
+                await new Promise(r => setTimeout(r, 1500));
             }
         }
-        startBrowserTelegramPoller();
 
         async function processTelegramUpdateClient(update) {
             let chatId = null;
@@ -1450,15 +1471,29 @@
                     chat.scrollTop = chat.scrollHeight;
                 }
             } else if (callbackData) {
-                replyText = `⚡ Action Dispatched: <code>${callbackData}</code>`;
+                replyText = `⚡ Action Dispatched: <code>${escapeHtml(callbackData)}</code>`;
             }
 
             if (replyText && chatId) {
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ chat_id: chatId, text: replyText, parse_mode: 'HTML' })
-                }).catch(()=>{});
+                try {
+                    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ chat_id: chatId, text: replyText, parse_mode: 'HTML' })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) {
+                        console.warn("HTML sendMessage failed, trying plain text fallback:", data);
+                        const plainText = replyText.replace(/<[^>]+>/g, '');
+                        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ chat_id: chatId, text: plainText })
+                        });
+                    }
+                } catch (e) {
+                    console.error("Telegram Send Error:", e);
+                }
             }
         }
 
@@ -1934,19 +1969,23 @@
             const cmd = text.toLowerCase().replace('/', '');
             const firstWord = cmd.split(' ')[0];
 
-            if (cmd === 'start' || cmd === 'init') {
-                return `👋 <b>Welcome to GovtJob AI Agent Command Center!</b>\n\nI am your 24/7 remote control interface for government job notifications, AI eligibility evaluations, and form updates.\n\nType /help or /jobs to get started.`;
+            if (['hi', 'hello', 'hey', 'namaste', 'bhai', 'bot', 'hlo', 'start', 'init'].includes(cmd)) {
+                return `👋 <b>Welcome to GovtJob AI Agent Command Center!</b>\n\nI am your 24/7 remote control interface for government job notifications, AI eligibility evaluations, and live form updates.\n\nType <b>/jobs</b> or <b>/profile</b> to get started!`;
             }
 
-            if (cmd === 'help' || cmd === 'commands') {
+            if (['help', 'commands', 'helpdesk'].includes(cmd)) {
                 return `📖 <b>GovtJob AI Agent Command Reference</b>\n━━━━━━━━━━━━━━━━━━━━━━\n/start - Initialize Command Center\n/help - Show command reference\n/profile - View candidate bio-data & readiness\n/jobs - List active government job recruitments\n/status - System operational status\n━━━━━━━━━━━━━━━━━━━━━━`;
             }
 
-            if (cmd === 'profile' || cmd === 'bio' || cmd === 'biodata') {
+            if (['profile', 'bio', 'biodata', 'candidate'].includes(cmd)) {
                 return `🤖 <b>GovtJob AI Agent — Candidate Profile Evaluation</b>\n━━━━━━━━━━━━━━━━━━━━━━\n👤 <b>Candidate Bio-Data Summary</b>\n━━━━━━━━━━━━━━━━━━━━━━\n📛 <b>Name:</b> Garv Chauhan\n👫 <b>Gender:</b> Male\n🎂 <b>Age:</b> 23 Years\n🏷 <b>Category:</b> OBC\n🏛 <b>State:</b> Uttar Pradesh\n🎓 <b>Qualification:</b> B.Tech Computer Science (78%)\n📏 <b>Height:</b> 172 cm\n🆔 <b>Reg ID:</b> SSC100084920\n━━━━━━━━━━━━━━━━━━━━━━`;
             }
 
-            if (cmd === 'jobs' || cmd === 'job' || cmd === 'all jobs' || cmd === 'list') {
+            if (['scrape', 'scraping', 'find', 'finding', 'summarize', 'summarizing', 'update', 'search'].some(k => cmd.includes(k))) {
+                return `🤖 <b>GovtJob AI Agent Engine — Live Workflow Execution</b>\n━━━━━━━━━━━━━━━━━━━━━━\n🔍 <b>Step 1 [Discovery]:</b> Scraped 12 Government Job Portals (SSC, UPSC, RRB, IBPS, Defense, ISRO, UPPSC)\n⚙️ <b>Step 2 [Ingestion]:</b> Extracted & Summarized Vacancies, Qualifications & Fee Structures\n📊 <b>Step 3 [Evaluation]:</b> Matched Candidate Profile (Garv Chauhan | B.Tech CS | OBC | 23y)\n━━━━━━━━━━━━━━━━━━━━━━\n\nType <b>/jobs</b> to see all active job recruitments or send any job number (e.g. <b>/job1</b>)!`;
+            }
+
+            if (['jobs', 'job', 'all jobs', 'list', 'all'].includes(cmd)) {
                 let reply = `🤖 <b>GovtJob AI Agent Engine — Live Workflow Execution</b>\n━━━━━━━━━━━━━━━━━━━━━━\n🔍 <b>Step 1 [Discovery]:</b> Scraped 12 Government Job Portals (SSC, UPSC, RRB, IBPS, Defense, ISRO, UPPSC)\n⚙️ <b>Step 2 [Ingestion]:</b> Extracted & Summarized Vacancies, Qualifications & Fee Structures\n📊 <b>Step 3 [Evaluation]:</b> Matched Candidate Profile (Garv Chauhan | B.Tech CS | OBC | 23y)\n━━━━━━━━━━━━━━━━━━━━━━\n\n🔥 <b>All Active Government Job Recruitments (12 Streams Monitored)</b>\n━━━━━━━━━━━━━━━━━━━━━━\n`;
                 GLOBAL_ALL_JOBS.forEach((j, idx) => {
                     reply += `${idx + 1}. <b>${j.title}</b> (${j.vacancies})\n   👉 <i>Send /job${idx + 1} or job${idx + 1} for complete details</i>\n\n`;
@@ -1964,7 +2003,7 @@
                 }
             }
 
-            if (cmd === 'status' || cmd === 'health' || cmd === 'telemetry') {
+            if (['status', 'health', 'telemetry', 'ping'].includes(cmd)) {
                 return `⚡ <b>GovtJob Engine Telemetry</b>\n━━━━━━━━━━━━━━━━━━━━━━\n🤖 <b>Bot Status:</b> Active 24/7 (Real-Time Auto-Responder)\n🔍 <b>Scrapers:</b> 8 Active Plugins (SSC, UPSC, RRB, Banking, Defense, Medical, Teaching, PSU)\n👤 <b>Candidate:</b> Garv Chauhan (B.Tech CS, OBC, 23y)\n🎯 <b>Status:</b> All ${GLOBAL_ALL_JOBS.length} recruitments monitored & evaluated!\n━━━━━━━━━━━━━━━━━━━━━━`;
             }
 
@@ -1975,7 +2014,8 @@
                 }
             }
 
-            return `🤖 Received: "<b>${text}</b>"\n\nType <b>/jobs</b> or <b>jobs</b> to view all 12 active government recruitments, or <b>/profile</b> to view bio-data!`;
+            const cleanInput = escapeHtml(text);
+            return `🤖 <b>GovtJob AI Agent Received:</b> "<b>${cleanInput}</b>"\n\nType <b>/jobs</b> or <b>jobs</b> to view all 12 active government recruitments, or <b>/profile</b> to view bio-data!`;
         }
 
         async function submitChatInput() {

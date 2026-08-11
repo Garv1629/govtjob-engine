@@ -72,16 +72,10 @@ async def start_telegram_poller():
                             text = msg.get("text", "").strip()
 
                             if text:
-                                command = text.split()[0].lower()
-                                if not command.startswith("/"):
-                                    command = "/" + command
-                                
-                                args = text.split()[1:]
-                                
                                 db = SessionLocal()
                                 try:
                                     cmd_center = TelegramBotCommandCenter(db_session=db)
-                                    res = await cmd_center.handle_command(command, user_id, args)
+                                    res = await cmd_center.handle_command(text, user_id)
                                 finally:
                                     db.close()
                                 

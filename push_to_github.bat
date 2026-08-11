@@ -11,6 +11,6 @@ git branch -M main
 git remote add origin https://github.com/Garv1629/govtjob-engine.git 2>nul
 git remote set-url origin https://github.com/Garv1629/govtjob-engine.git 2>nul
 echo Pushing code to GitHub repository (https://github.com/Garv1629/govtjob-engine.git)...
-git push -u origin main
+git push -u origin main --force
 echo Done! Pushed latest updates successfully.
 pause

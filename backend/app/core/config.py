@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Network & Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "https://app.govtjob.ai"]
+    CORS_ORIGINS: List[str] = ["*"]
 
     # Database & Redis
     DATABASE_URL: str = "postgresql+asyncpg://govtjob:production_secure_pass@postgres:5432/govtjob_db"

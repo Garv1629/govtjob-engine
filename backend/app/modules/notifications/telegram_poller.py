@@ -26,6 +26,13 @@ async def start_telegram_poller():
     logger.info("[TelegramPoller] Starting background Telegram long-poller worker...")
 
     async with httpx.AsyncClient(timeout=15.0) as client:
+        # Clear any existing webhook so getUpdates long-polling works without 409 Conflict
+        try:
+            del_resp = await client.post(f"{base_url}/deleteWebhook?drop_pending_updates=false")
+            logger.info(f"[TelegramPoller] Cleared webhook status: {del_resp.status_code} {del_resp.text}")
+        except Exception as e:
+            logger.warning(f"[TelegramPoller] Webhook clear warning: {e}")
+
         while is_polling:
             try:
                 url = f"{base_url}/getUpdates?offset={offset}&timeout=5"
